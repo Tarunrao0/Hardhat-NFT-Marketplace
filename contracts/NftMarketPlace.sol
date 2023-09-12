@@ -3,8 +3,9 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelon/contracts/security/ReentrancyGuard.sol";
 
-contract  NFTMarketPlace {
+contract  NFTMarketPlace is ReentrancyGuard {
     struct Listing {
         uint256 price;
         address seller;
@@ -17,9 +18,24 @@ contract  NFTMarketPlace {
         uint256 price
     );
 
+    event ItemBought (
+        address indexed buyer,
+        address indexed nftAddress,
+        uint256 indexed tokenId,
+        uint256 price
+    );
+
+    event ItemCanceled (
+        address indexed seller,
+        address indexed nftAddress,
+        uint256 indexed tokenId
+    )
+
 //Mappings
 // NFT Contract Address --> NFT token ID --> Listing
     mapping (address => mapping (uint256 => Listing)) private s_listings;
+// Seller address --> Amount earned
+    mapping (address => uint256) private s_proceeds;
 
 //errors
     error NFTMarketPlace__PriceMustBeAboveZero();
@@ -27,6 +43,9 @@ contract  NFTMarketPlace {
     error NFTMarketPlace__AlreadyListed(address nftAddress, uint256 tokenId);
     error NFTMarketPlace__NotOwner();
     error NFTMarketPlace__NotListed(address nftAddress, uint256 tokenId);
+    error NFTMarketPlace__PriceNotMet(address nftAddress, uint256 tokenId, uint256 price );
+    error NFTMarketPlace__NoProceeds();
+    error NFTMarketPlace__TransferFailed();
 /**
  * We're gonna need a couple of functions
  * 1. `listItem`: List the NFTs on the marketplace
@@ -77,7 +96,7 @@ contract  NFTMarketPlace {
      * 3) Check if it costs 0 or below 0 if yes return error
      * 4) Update the mapping
      */
-   function listItems(
+function listItems(
     address nftAddress,
     uint256 tokenId,
     uint256 price
@@ -104,11 +123,94 @@ contract  NFTMarketPlace {
     s_listings[nftAddress][tokenId] = Listing (price, msg.sender);
     emit ItemListed (msg.sender, nftAddress, tokenId, price);
    }
-
-   function buyItem (address nftAddress, uint256 tokenId) 
+   /**
+    * 
+    * @param nftAddress : address of the contract minting the NFTs
+    * @param tokenId : ID number of the NFT
+    * 1) check if they sent enough ETH else revert
+    * 2) update the balance of the seller
+    * 3) Delete the listing
+    * 4) Transfer the NFT from the seller to the sender 
+    */
+   /**
+    * IMP : Reentrancy Attacks
+    * basically if you havent reset the balance of the account before withdrawing 
+    * an attacker could withdraw before the balance resets
+    * 
+    * FIX : 
+    * 1) call the reset balance before withdrawing (or)
+    * 2) Openzeppelin comes with a method of locking the function while the withdrawal takes place using a modifier
+    * ex : status = _ENTERED;
+    *       _;
+    *      status = _NOT_ENTERED;
+    * And use a bool inside the function to be able to withdraw only if it isnt locked
+    */
+function buyItem (address nftAddress, uint256 tokenId) 
    external 
    payable
+   nonReentrant
    isListed(nftAddress, tokenId) {
+        Listing memory listedItems = s_listings[nftAddress][tokenId]
+        if (msg.value < listedItems.price ) {
+            revert NFTMarketPlace__PriceNotMet(nftAddress, tokenId, listedItems.price);
+        }
+        //Sending the money to the user ❌
+        //Have them withdraw the money ✅
+        //They can just withdraw their total amount from the s_proceeds data structure
+        s_proceeds[listedItems.seller] = s_proceeds[listedItems.seller] + msg.value;
+        delete (s_listings[nftAddress][tokenId]);
+        IERC721(nftAddress).safeTransferFrom (listedItems.seller, msg.sender, tokenId);
+        //check to make sure the NFT was transferred
+        emit ItemBought( msg.sender, nftAddress, tokenId, listedItems.price     ) 
 
-   }
+}
+
+function cancelListing ( address nftAddress, uint256 tokenId ) 
+    external
+    isOwner (nftAddress, tokenId, msg.sender)
+    isListed ( nftAddress, tokenId )
+{
+    delete (s_listings[nftAddress][tokenId]);
+    emit ItemCanceled (msg.sender, nftAddress, tokenId );
+}
+
+function updateListing (
+    address nftAddress,
+    uint256 tokenId,
+    uint256 newPrice
+) external
+  isOwner (nftAddress, tokenId, msg.sender)
+  isListed ( nftAddress, tokenId )
+{
+    s_listings[nftAddress][tokenId].price = newPrice;
+    emit ItemListed (msg.sender, nftAddress, tokenId, newPrice)
+}
+
+function withdrawProceeds () external {
+    uint256 proceeds = s_proceeds[msg.sender]
+    if ( proceeds <= 0) {
+        revert NFTMarketPlace__NoProceeds();
+    }
+    s_proceeds[msg.sender] = 0; //preventing a reentrancy attack by calling the state changes first
+    ( bool success, ) = payable (msg.sender).call {value: proceeds}("")
+    if (!success ) {
+        revert NFTMarketPlace__TransferFailed();
+    }
+}
+
+    ///////////////////////
+    // Getter Functions //
+   //////////////////////
+
+    function getListing ( address nftAddress, uint256 tokenId )
+        external
+        view
+        returns (Listing memory)
+    {
+        return s_listings [nftAddress][tokenId];
+    }
+
+    function getProceeds (address seller) external view returns (uint256) {
+        return s_proceeds [seller];
+    }
 }
