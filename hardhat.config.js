@@ -36,9 +36,11 @@ module.exports = {
             //   url: MAINNET_RPC_URL
             // }
             chainId: 31337,
+            blockConfirmations: 6,
         },
         localhost: {
             chainId: 31337,
+            blockConfirmations: 6,
         },
         sepolia: {
             url: SEPOLIA_RPC_URL,
@@ -48,6 +50,7 @@ module.exports = {
             //   },
             saveDeployments: true,
             chainId: 11155111,
+            blockConfirmations: 6,
         },
         mainnet: {
             url: MAINNET_RPC_URL,
@@ -57,12 +60,16 @@ module.exports = {
             //   },
             saveDeployments: true,
             chainId: 1,
+            blockConfirmations: 6,
+
         },
         polygon: {
             url: POLYGON_MAINNET_RPC_URL,
             accounts: PRIVATE_KEY !== undefined ? [PRIVATE_KEY] : [],
             saveDeployments: true,
             chainId: 137,
+            blockConfirmations: 6,
+
         },
     },
     etherscan: {
@@ -88,7 +95,7 @@ module.exports = {
             default: 0, // here this will by default take the first account as deployer
             1: 0, // similarly on mainnet it will take the first account as deployer. Note though that depending on how hardhat network are configured, the account 0 on one network can be different than on another
         },
-        player: {
+        user: {
             default: 1,
         },
     },

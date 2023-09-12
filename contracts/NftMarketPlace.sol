@@ -3,9 +3,9 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelon/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract  NFTMarketPlace is ReentrancyGuard {
+contract  NftMarketPlace is ReentrancyGuard {
     struct Listing {
         uint256 price;
         address seller;
@@ -29,7 +29,7 @@ contract  NFTMarketPlace is ReentrancyGuard {
         address indexed seller,
         address indexed nftAddress,
         uint256 indexed tokenId
-    )
+    );
 
 //Mappings
 // NFT Contract Address --> NFT token ID --> Listing
@@ -38,14 +38,14 @@ contract  NFTMarketPlace is ReentrancyGuard {
     mapping (address => uint256) private s_proceeds;
 
 //errors
-    error NFTMarketPlace__PriceMustBeAboveZero();
-    error NFTMarketPlace__NotApproved();
-    error NFTMarketPlace__AlreadyListed(address nftAddress, uint256 tokenId);
-    error NFTMarketPlace__NotOwner();
-    error NFTMarketPlace__NotListed(address nftAddress, uint256 tokenId);
-    error NFTMarketPlace__PriceNotMet(address nftAddress, uint256 tokenId, uint256 price );
-    error NFTMarketPlace__NoProceeds();
-    error NFTMarketPlace__TransferFailed();
+    error NftMarketPlace__PriceMustBeAboveZero();
+    error NftMarketPlace__NotApproved();
+    error NftMarketPlace__AlreadyListed(address nftAddress, uint256 tokenId);
+    error NftMarketPlace__NotOwner();
+    error NftMarketPlace__NotListed(address nftAddress, uint256 tokenId);
+    error NftMarketPlace__PriceNotMet(address nftAddress, uint256 tokenId, uint256 price );
+    error NftMarketPlace__NoProceeds();
+    error NftMarketPlace__TransferFailed();
 /**
  * We're gonna need a couple of functions
  * 1. `listItem`: List the NFTs on the marketplace
@@ -61,27 +61,27 @@ contract  NFTMarketPlace is ReentrancyGuard {
    //gotta make sure we're not re-listing NFTs
 
    modifier notListed(address nftAddress, uint256 tokenId, address owner) {
-        Listing memory listing = s_listings[nftAddress][tokenId]
+        Listing memory listing = s_listings[nftAddress][tokenId];
         if (listing.price > 0){
-            revert NFTMarketPlace__AlreadyListed(nftAddress, tokenId);
+            revert NftMarketPlace__AlreadyListed(nftAddress, tokenId);
         }
         _;    
    }
     // Making sure only the Owner can use the NFT contract
    modifier isOwner(address nftAddress, uint256 tokenId, address spender){
        IERC721 nft = IERC721(nftAddress);
-       address owner = nft.ownerOf(tokenId)
+       address owner = nft.ownerOf(tokenId);
        if( spender != owner) {
-        revert NFTMarketPlace__NotOwner();
+        revert NftMarketPlace__NotOwner();
        }
        _;
    }
 
    // Need Listed NFTs to buy!!
    modifier isListed(address nftAddress, uint256 tokenId){
-    Listing memory listing = s_listings[nftAddress][tokenId]
+    Listing memory listing = s_listings[nftAddress][tokenId];
         if (listing.price <= 0){
-            revert NFTMarketPlace__NotListed(nftAddress, tokenId);
+            revert NftMarketPlace__NotListed(nftAddress, tokenId);
         }
         _;
    }
@@ -96,7 +96,7 @@ contract  NFTMarketPlace is ReentrancyGuard {
      * 3) Check if it costs 0 or below 0 if yes return error
      * 4) Update the mapping
      */
-function listItems(
+function listItem(
     address nftAddress,
     uint256 tokenId,
     uint256 price
@@ -104,7 +104,7 @@ function listItems(
     notListed(nftAddress, tokenId, msg.sender) 
     isOwner(nftAddress, tokenId, msg.sender){
         if (price <= 0){
-            revert NFTMarketPlace__PriceMustBeAboveZero();
+            revert NftMarketPlace__PriceMustBeAboveZero();
         }
     /**
      * The basic way would be to let the contract "hold" the NFT, but that wouldnt be not so gas effecient
@@ -118,7 +118,7 @@ function listItems(
      */
     IERC721 nft = IERC721(nftAddress);
     if (nft.getApproved(tokenId) != address(this)) {
-        revert NFTMarketPlace__NotApproved();
+        revert NftMarketPlace__NotApproved();
     }
     s_listings[nftAddress][tokenId] = Listing (price, msg.sender);
     emit ItemListed (msg.sender, nftAddress, tokenId, price);
@@ -150,9 +150,9 @@ function buyItem (address nftAddress, uint256 tokenId)
    payable
    nonReentrant
    isListed(nftAddress, tokenId) {
-        Listing memory listedItems = s_listings[nftAddress][tokenId]
+        Listing memory listedItems = s_listings[nftAddress][tokenId];
         if (msg.value < listedItems.price ) {
-            revert NFTMarketPlace__PriceNotMet(nftAddress, tokenId, listedItems.price);
+            revert NftMarketPlace__PriceNotMet(nftAddress, tokenId, listedItems.price);
         }
         //Sending the money to the user ❌
         //Have them withdraw the money ✅
@@ -161,7 +161,7 @@ function buyItem (address nftAddress, uint256 tokenId)
         delete (s_listings[nftAddress][tokenId]);
         IERC721(nftAddress).safeTransferFrom (listedItems.seller, msg.sender, tokenId);
         //check to make sure the NFT was transferred
-        emit ItemBought( msg.sender, nftAddress, tokenId, listedItems.price     ) 
+        emit ItemBought( msg.sender, nftAddress, tokenId, listedItems.price);
 
 }
 
@@ -181,20 +181,23 @@ function updateListing (
 ) external
   isOwner (nftAddress, tokenId, msg.sender)
   isListed ( nftAddress, tokenId )
-{
+{   
+    if (newPrice <= 0){
+        revert NftMarketPlace__PriceMustBeAboveZero();
+    }
     s_listings[nftAddress][tokenId].price = newPrice;
-    emit ItemListed (msg.sender, nftAddress, tokenId, newPrice)
+    emit ItemListed (msg.sender, nftAddress, tokenId, newPrice);
 }
 
 function withdrawProceeds () external {
-    uint256 proceeds = s_proceeds[msg.sender]
+    uint256 proceeds = s_proceeds[msg.sender];
     if ( proceeds <= 0) {
-        revert NFTMarketPlace__NoProceeds();
+        revert NftMarketPlace__NoProceeds();
     }
     s_proceeds[msg.sender] = 0; //preventing a reentrancy attack by calling the state changes first
-    ( bool success, ) = payable (msg.sender).call {value: proceeds}("")
+    ( bool success, ) = payable (msg.sender).call {value: proceeds}("");
     if (!success ) {
-        revert NFTMarketPlace__TransferFailed();
+        revert NftMarketPlace__TransferFailed();
     }
 }
 
