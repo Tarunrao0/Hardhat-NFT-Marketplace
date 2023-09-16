@@ -4,13 +4,12 @@ pragma solidity ^0.8.7;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
 contract BasicNft is ERC721 {
-    string public constant TOKEN_URI =
-        "https://ipfs.io/ipfs/Qme2LChChpf6LZV3cqXCB5GbbdDjqGzUXynRguarMt865v?filename=Travis.json";
+    string public constant TokenURIs = "https://ipfs.io/ipfs/QmaRL6NGxhXxHEsW3TqLXsYd1Njn7W6F5X2Ypu6NUPiWs8?filename=Travis.png";
     uint256 private s_tokenCounter;
 
     event NFTMinted(uint256 indexed tokenId);
 
-    constructor() ERC721("TRAVIS", "RAP") {
+    constructor() ERC721("Rapcoin", "RAP") {
         s_tokenCounter = 0;
     }
 
@@ -22,7 +21,7 @@ contract BasicNft is ERC721 {
 
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         require(_exists(tokenId), "ERC721Metadata: URI query for nonexistent token");
-        return TOKEN_URI;
+        return TokenURIs;
     }
 
     function getTokenCounter() public view returns (uint256) {
